@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMA 8 Surakarta - E-MADING Canvas Interactive</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 1.5rem;
+    }
+    
+    .dark .glass-panel {
+      background: rgba(26, 24, 22, 0.9);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.5rem;
+    }
+
+    canvas#gridCanvas {
+      cursor: grab;
+      touch-action: none;
+    }
+    canvas#gridCanvas:active {
+      cursor: grabbing;
+    }
+
+    @keyframes pulseExclamation {
+      0% { transform: scale(0.9); opacity: 0.85; }
+      50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.5)); }
+      100% { transform: scale(0.9); opacity: 0.85; }
+    }
+    .animate-exclamation {
+      animation: pulseExclamation 1.3s infinite ease-in-out;
+    }
+
+    .active-style-btn { background: rgba(217, 119, 6, 0.18); }
+    #passwordModal:not(.pointer-events-none) > div,
+    #postModal:not(.pointer-events-none) > div,
+    #helpModal:not(.pointer-events-none) > div,
+    #imageZoomModal:not(.pointer-events-none) > div { --tw-scale-x: 1 !important; --tw-scale-y: 1 !important; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+  </style>
+</head>
+
+<body class="h-full w-full bg-stone-100 text-stone-800 dark:bg-[#121110] dark:text-stone-100 transition-colors duration-300">
+
+  <!-- MAIN CANVAS CONTAINER -->
+  <div id="canvas-container" class="relative w-full h-full overflow-hidden">
+    <canvas id="gridCanvas" class="w-full h-full block"></canvas>
+    <div id="overlayContainer" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+  </div>
+
+  <!-- FLOATING HEADER ISLANDS (TOP-LEFT) -->
+  <div class="fixed top-4 left-4 z-30 flex items-center gap-2">
+    <header class="flex items-center gap-3 p-2.5 pr-5 rounded-3xl glass-panel shadow-lg shadow-stone-900/10 transition-all hover:shadow-xl">
+      <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-600 to-stone-700 p-0.5 shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
+        <img 
+          src="https://sman8solo.sch.id/wp-content/uploads/2025/01/sma8.png" 
+          alt="SMA 8 Surakarta Logo" 
+          class="w-full h-full object-contain p-1 rounded-2xl bg-white dark:bg-[#1a1816]"
+          onerror="this.onerror=null; this.classList.add('hidden'); document.getElementById('logo-fallback').classList.remove('hidden');"
+        />
+        <div id="logo-fallback" class="hidden text-white font-extrabold text-lg flex items-center justify-center">8</div>
+      </div>
+      <div class="flex flex-col">
+        <h1 class="text-base font-extrabold tracking-tight text-stone-900 dark:text-stone-100 leading-tight">SMA 8 Surakarta</h1>
+        <div class="flex items-center gap-1.5">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-[11px] font-bold tracking-widest text-amber-700 dark:text-amber-500 uppercase">E-MADING</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-200 dark:bg-[#262320] text-stone-600 dark:text-stone-400 font-medium">115×50 Grid</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ADMIN / VISITOR MODE SWITCHER -->
+    <button 
+      id="modeSwitcherBtn" 
+      class="flex items-center gap-2 px-3.5 py-3 rounded-3xl glass-panel shadow-lg shadow-stone-900/10 hover:bg-stone-200/50 dark:hover:bg-[#262320] transition-all active:scale-95 text-xs font-bold text-stone-700 dark:text-stone-200 cursor-pointer"
+      title="Klik untuk mengubah Mode Admin / Pengunjung"
+    >
+      <div id="modeIconBadge" class="p-1 rounded-xl bg-stone-200 dark:bg-[#262320] text-stone-600 dark:text-stone-300">
+        <i data-lucide="eye" class="w-4 h-4"></i>
+      </div>
+      <div class="flex flex-col text-left">
+        <span class="text-[10px] uppercase font-bold text-stone-400 dark:text-stone-500 leading-none">Akses Mode</span>
+        <span id="modeStatusText" class="text-xs font-extrabold text-stone-700 dark:text-stone-300">Pengunjung</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- TOP-RIGHT CONTROL BAR -->
+  <div class="fixed top-4 right-4 z-30 flex items-center gap-2">
+    <div class="relative hidden sm:block">
+      <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400"></i>
+      <input type="text" id="searchInput" placeholder="Cari mading..." class="pl-9 pr-4 py-2 text-xs rounded-2xl glass-panel text-stone-800 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 w-44 focus:w-60 transition-all shadow-sm" />
+    </div>
+
+    <div class="relative">
+      <select id="categoryFilter" class="appearance-none pl-3 pr-8 py-2 text-xs font-semibold rounded-2xl glass-panel text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm cursor-pointer">
+        <option value="ALL">Semua Kategori</option>
+        <option value="Pengumuman OSIS">Pengumuman OSIS</option>
+        <option value="Karya Seni">Karya Seni & Sastra</option>
+        <option value="Prestasi">Prestasi Delta</option>
+        <option value="Literasi">Literasi & Mading</option>
+        <option value="Kegiatan Ekstra">Kegiatan Ekstra</option>
+        <option value="Informasi Sekolah">Info Sekolah</option>
+      </select>
+      <i data-lucide="chevron-down" class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none"></i>
+    </div>
+
+    <button id="themeToggleBtn" title="Ubah Tema" class="p-2.5 rounded-2xl glass-panel text-stone-700 dark:text-stone-200 hover:bg-white/90 dark:hover:bg-[#262320] transition-all shadow-sm active:scale-95">
+      <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+      <i data-lucide="sun" class="w-4 h-4 hidden dark:block text-amber-400"></i>
+    </button>
+
+    <button id="helpBtn" title="Petunjuk Penggunaan" class="p-2.5 rounded-2xl glass-panel text-stone-700 dark:text-stone-200 hover:bg-white/90 dark:hover:bg-[#262320] transition-all shadow-sm active:scale-95">
+      <i data-lucide="help-circle" class="w-4 h-4"></i>
+    </button>
+  </div>
+
+  <!-- FLOATING ZOOM & VIEW CONTROLS (BOTTOM-LEFT) -->
+  <div class="fixed bottom-4 left-4 z-30 flex items-center gap-1.5 p-1.5 rounded-3xl glass-panel shadow-lg shadow-stone-900/10">
+    <button id="zoomInBtn" title="Perbesar (Zoom In)" class="p-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] text-stone-700 dark:text-stone-200 transition-all active:scale-95"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+    <button id="zoomOutBtn" title="Perkecil (Zoom Out)" class="p-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] text-stone-700 dark:text-stone-200 transition-all active:scale-95"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+    <span id="zoomPercentage" class="text-xs font-mono font-bold text-stone-600 dark:text-stone-300 px-2 min-w-[42px] text-center">65%</span>
+    <div class="w-px h-4 bg-stone-300 dark:bg-stone-700 mx-0.5"></div>
+    <button id="resetViewBtn" title="Reset Pandangan" class="p-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] text-stone-700 dark:text-stone-200 transition-all active:scale-95"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>
+    <button id="fitScreenBtn" title="Muat Layar Penuh Grid" class="p-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] text-stone-700 dark:text-stone-200 transition-all active:scale-95"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
+  </div>
+
+  <!-- FLOATING ISLAND DI TENGAH BAWAH: STYLE & BACKGROUND -->
+  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2">
+    <div id="stylePickerPanel" class="hidden glass-panel p-2 rounded-3xl shadow-xl flex items-center gap-2 border border-stone-200/80 dark:border-stone-800 transition-all duration-200 scale-95 opacity-0">
+      <button data-style="default" class="style-option-btn active-style-btn flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all hover:bg-stone-200/70 dark:hover:bg-[#262320] text-stone-800 dark:text-stone-200">
+        <div class="w-4 h-4 rounded-full bg-amber-500 border border-white shadow-sm shrink-0"></div><span>Default</span>
+      </button>
+      <button data-style="3d-real" class="style-option-btn flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all hover:bg-stone-200/70 dark:hover:bg-[#262320] text-stone-800 dark:text-stone-200">
+        <div class="w-4 h-4 rounded-full bg-amber-800 border border-amber-600 shadow-sm shrink-0"></div><span>Mading 3D Real Life</span>
+      </button>
+      <button data-style="metal-board" class="style-option-btn flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all hover:bg-stone-200/70 dark:hover:bg-[#262320] text-stone-800 dark:text-stone-200">
+        <div class="w-4 h-4 rounded-full bg-slate-400 border border-slate-200 shadow-sm shrink-0"></div><span>Papan Mading Besi</span>
+      </button>
+    </div>
+
+    <div id="bgPickerPanel" class="hidden glass-panel p-2 rounded-3xl shadow-xl flex items-center gap-2 border border-stone-200/80 dark:border-stone-800 transition-all duration-200 scale-95 opacity-0">
+      <button data-bg="default" class="bg-option-btn flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all hover:bg-stone-200/70 dark:hover:bg-[#262320] text-stone-800 dark:text-stone-200 active-style-btn">
+        <div class="w-4 h-4 rounded-full bg-stone-400 border border-white shadow-sm shrink-0"></div><span>Solid (Default)</span>
+      </button>
+      <button data-bg="sekolah" class="bg-option-btn flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all hover:bg-stone-200/70 dark:hover:bg-[#262320] text-stone-800 dark:text-stone-200">
+        <div class="w-4 h-4 rounded-full bg-cover bg-center border border-amber-500 shadow-sm shrink-0" style="background-image: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQa3Oe395pp_6MVt0i32W_kKIYpDVy8GF4oUMaeSe9jf8Four7jsJOtcdc&s=10');"></div><span>Gedung Sekolah (Parallax)</span>
+      </button>
+    </div>
+
+    <div class="flex items-center gap-1.5 p-1 rounded-3xl glass-panel shadow-lg shadow-stone-900/10">
+      <button id="styleIslandBtn" class="flex items-center gap-2 px-4 py-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] transition-all active:scale-95 text-xs font-bold text-stone-800 dark:text-stone-100 cursor-pointer">
+        <i data-lucide="palette" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i><span>Style</span>
+      </button>
+      <div class="w-px h-4 bg-stone-300 dark:bg-stone-700"></div>
+      <button id="bgIslandBtn" class="flex items-center gap-2 px-4 py-2 rounded-2xl hover:bg-stone-200/60 dark:hover:bg-[#262320] transition-all active:scale-95 text-xs font-bold text-stone-800 dark:text-stone-100 cursor-pointer">
+        <i data-lucide="image" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i><span>Background</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM-RIGHT MINIMAP -->
+  <div class="fixed bottom-4 right-4 z-30 flex flex-col items-end gap-2">
+    <div class="p-2 rounded-3xl glass-panel shadow-lg flex flex-col items-center">
+      <div class="text-[10px] font-bold text-stone-500 dark:text-stone-400 mb-1 flex items-center justify-between w-full px-1">
+        <span>MINIMAP 115x50</span>
+        <span id="coordinatesDisplay" class="text-amber-700 dark:text-amber-500 font-mono">X:0 Y:0</span>
+      </div>
+      <div class="relative overflow-hidden rounded-2xl border border-stone-300 dark:border-stone-800 bg-stone-200/80 dark:bg-[#121110]">
+        <canvas id="minimapCanvas" width="160" height="70" class="block cursor-pointer"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSWORD MODAL -->
+  <div id="passwordModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="relative w-full max-w-sm rounded-[2rem] glass-panel bg-white/95 dark:bg-[#1a1816]/95 shadow-2xl border border-stone-200 dark:border-stone-800 p-6 transform scale-95 transition-transform duration-300">
+      <button id="closePassBtn" class="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="flex items-center gap-3 mb-4">
+        <div class="p-3 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"><i data-lucide="lock" class="w-6 h-6"></i></div>
+        <div>
+          <h3 class="text-base font-bold text-stone-900 dark:text-white">Akses Admin</h3>
+          <p class="text-xs text-stone-500 dark:text-stone-400">Masukkan kata sandi administrator</p>
+        </div>
+      </div>
+      <form id="passwordForm" class="space-y-4">
+        <div>
+          <input type="password" id="adminPasswordInput" placeholder="Kata sandi..." required class="w-full px-4 py-2.5 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          <p id="passwordError" class="hidden text-[11px] text-rose-500 font-semibold mt-1.5 flex items-center gap-1"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Sandi salah, silakan coba lagi.</p>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="cancelPassBtn" class="px-4 py-2 text-xs font-semibold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#262320] rounded-xl">Batal</button>
+          <button type="submit" class="px-5 py-2 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-2xl shadow-md transition-all">Masuk Mode Admin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- POST CREATION / VIEW MODAL -->
+  <div id="postModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="relative w-full max-w-xl rounded-[2.5rem] glass-panel bg-white/95 dark:bg-[#1a1816]/95 shadow-2xl border border-stone-200 dark:border-stone-800 p-6 transform scale-95 transition-transform duration-300 overflow-hidden max-h-[90vh] overflow-y-auto">
+      <button id="closeModalBtn" class="absolute top-5 right-5 p-2 rounded-full text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-[#262320] transition-all z-10"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+      <!-- VIEW POST -->
+      <div id="viewPostView" class="hidden">
+        <div class="flex items-center gap-2 mb-3">
+          <span id="viewPostCategory" class="px-3 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Kategori</span>
+          <span id="viewPostSize" class="text-xs font-mono text-stone-500 bg-stone-200/60 dark:bg-[#262320] px-2 py-0.5 rounded-full">Ukuran: 7x5</span>
+          <span id="viewPostCoord" class="text-xs font-mono text-stone-400">[0, 0]</span>
+        </div>
+        <h2 id="viewPostTitle" class="text-xl font-extrabold text-stone-900 dark:text-white mb-2 leading-snug">Judul Mading</h2>
+        <p id="viewPostAuthor" class="text-xs text-stone-500 dark:text-stone-400 mb-4 flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5"></i> Oleh: <span class="font-semibold text-stone-700 dark:text-stone-300">Nama Pengirim</span> • <span id="viewPostDate">Hari Ini</span></p>
+
+        <!-- IMAGE PREVIEW CLICKABLE TO FULLSCREEN -->
+        <div id="viewPostImageContainer" class="hidden relative group mb-4 rounded-3xl overflow-hidden border border-stone-200 dark:border-stone-800 max-h-80 bg-stone-100 dark:bg-[#262320] flex items-center justify-center p-2 cursor-pointer" title="Klik untuk pratinjau Fullscreen & Zoom">
+          <img id="viewPostImage" src="" alt="Mading Content" class="max-h-72 w-auto object-contain rounded-2xl transition-transform duration-300 group-hover:scale-102" />
+          <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-2">
+            <i data-lucide="maximize" class="w-5 h-5"></i> Perbesar Gambar
+          </div>
+        </div>
+
+        <div id="viewPostContent" class="text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap bg-stone-50 dark:bg-[#262320]/60 p-4 rounded-2xl border border-stone-200/80 dark:border-stone-800">Isi konten mading...</div>
+
+        <div class="mt-6 flex justify-between items-center pt-2 border-t border-stone-200 dark:border-stone-800">
+          <button id="editPostBtn" class="hidden px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition-all flex items-center gap-1"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit Mading</button>
+          <div class="flex gap-2 ml-auto">
+            <button id="deletePostBtn" class="hidden px-4 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all">Hapus</button>
+            <button id="closeViewBtn" class="px-5 py-2 text-xs font-semibold bg-stone-200 hover:bg-stone-300 dark:bg-[#262320] dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 rounded-2xl transition-all">Tutup</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREATE / EDIT POST -->
+      <div id="createPostView" class="hidden">
+        <div class="mb-4">
+          <h2 id="modalFormTitle" class="text-lg font-bold text-stone-900 dark:text-white">Tempelkan Mading Baru</h2>
+          <p class="text-xs text-stone-500 dark:text-stone-400">Koordinat Grid: <span id="createPostCoord" class="font-mono text-amber-700 dark:text-amber-500 font-semibold">[0, 0]</span></p>
+        </div>
+        <form id="createPostForm" class="space-y-4">
+          <div class="p-3.5 rounded-3xl bg-stone-100/80 dark:bg-[#262320] border border-stone-200 dark:border-stone-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold text-stone-800 dark:text-stone-200 flex items-center gap-1.5"><i data-lucide="scaling" class="w-4 h-4 text-amber-600"></i> Ukuran Mading (Kotak)</label>
+              <span id="sizePreviewLabel" class="text-xs font-mono font-bold text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full">7 Kolom × 5 Baris</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <div class="flex justify-between text-[11px] text-stone-500 mb-1"><span>Lebar (7 - 20)</span><span id="colsValDisplay">7</span></div>
+                <input type="range" id="inputCols" min="7" max="20" value="7" class="w-full accent-amber-600 cursor-pointer">
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] text-stone-500 mb-1"><span>Tinggi (5 - 15)</span><span id="rowsValDisplay">5</span></div>
+                <input type="range" id="inputRows" min="5" max="15" value="5" class="w-full accent-amber-600 cursor-pointer">
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1">Judul Mading</label>
+            <input type="text" id="inputTitle" required placeholder="Contoh: Hasil Lomba Seni Lukis Delta Fest" class="w-full px-3.5 py-2 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1">Kategori</label>
+              <select id="inputCategory" class="w-full px-3.5 py-2 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer">
+                <option value="Pengumuman OSIS">Pengumuman OSIS</option>
+                <option value="Karya Seni">Karya Seni & Sastra</option>
+                <option value="Prestasi">Prestasi Delta</option>
+                <option value="Literasi">Literasi & Mading</option>
+                <option value="Kegiatan Ekstra">Kegiatan Ekstra</option>
+                <option value="Informasi Sekolah">Info Sekolah</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1">Pengarang / Kelas</label>
+              <input type="text" id="inputAuthor" required placeholder="Contoh: Kirana (XI MIPA 1)" class="w-full px-3.5 py-2 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1">URL Gambar / Poster (Opsional)</label>
+            <input type="url" id="inputImageUrl" placeholder="https://images.unsplash.com/photo-..." class="w-full px-3.5 py-2 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1">Isi Konten Mading</label>
+            <textarea id="inputContent" rows="3" required placeholder="Tuliskan isi artikel, pengumuman, atau puisi..." class="w-full px-3.5 py-2 text-xs rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#262320] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"></textarea>
+          </div>
+          <div class="pt-2 flex justify-end gap-2">
+            <button type="button" id="cancelCreateBtn" class="px-4 py-2 text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#262320] rounded-xl transition-all">Batal</button>
+            <button type="submit" class="px-5 py-2 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-2xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Simpan ke Grid</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULLSCREEN IMAGE ZOOM PREVIEW MODAL -->
+  <div id="imageZoomModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+    <button id="closeZoomModalBtn" class="absolute top-5 right-5 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+    <div class="relative w-full h-full flex items-center justify-center overflow-hidden cursor-zoom-in" id="zoomContainer">
+      <img id="fullscreenZoomImage" src="" alt="Zoom Preview" class="max-w-full max-h-full object-contain transition-transform duration-150 transform scale-100 select-none" />
+    </div>
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white text-xs">
+      <button id="zoomInPrevBtn" class="p-1.5 hover:bg-white/20 rounded-lg"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+      <span id="zoomLevelIndicator" class="font-mono">100%</span>
+      <button id="zoomOutPrevBtn" class="p-1.5 hover:bg-white/20 rounded-lg"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+      <div class="w-px h-4 bg-white/20 mx-1"></div>
+      <button id="zoomResetBtn" class="px-2 py-1 hover:bg-white/20 rounded-lg font-semibold">Reset</button>
+    </div>
+  </div>
+
+  <!-- HELP MODAL -->
+  <div id="helpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="relative w-full max-w-md rounded-[2rem] glass-panel bg-white/95 dark:bg-[#1a1816]/95 shadow-2xl border border-stone-200 dark:border-stone-800 p-6 transform scale-95 transition-transform duration-300">
+      <button id="closeHelpBtn" class="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="flex items-center gap-3 mb-4">
+        <div class="p-3 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"><i data-lucide="layout-grid" class="w-6 h-6"></i></div>
+        <div>
+          <h3 class="text-base font-bold text-stone-900 dark:text-white">Panduan E-MADING Canvas</h3>
+          <p class="text-xs text-stone-500 dark:text-stone-400">SMA 8 Surakarta</p>
+        </div>
+      </div>
+      <div class="space-y-3 text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
+        <div class="flex items-start gap-2.5"><i data-lucide="shield" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i><p><strong>Mode Pengunjung vs Admin:</strong> Secara default Anda berada di Mode Pengunjung. Tekan tombol island di atas untuk masuk ke Mode Admin dengan sandi <code>SmaDelta8</code>.</p></div>
+        <div class="flex items-start gap-2.5"><i data-lucide="scaling" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i><p><strong>Drag & Resize Mading:</strong> Di Mode Admin, drag mading untuk memindahkan posisi atau tarik sudut kanan bawah untuk mengubah ukuran (min 7x5, maks 20x15). Panel mading dapat saling tumpang tindih secara fleksibel.</p></div>
+        <div class="flex items-start gap-2.5"><i data-lucide="maximize" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i><p><strong>Fullscreen & Zoom Gambar:</strong> Klik pada gambar di dalam detail mading untuk membuka pratinjau layar penuh dan memperbesarnya.</p></div>
+      </div>
+      <div class="mt-6"><button id="understandHelpBtn" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-2xl shadow-sm transition-all">Mengerti & Jelajahi</button></div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let canvas, ctx, overlayContainer, minimapCanvas, minimapCtx;
+    let width = 0, height = 0;
+    let offsetX = 0, offsetY = 0;
+    let scale = 0.65;
+    const minScale = 0.2;
+    const maxScale = 2.5;
+
+    const EXCLAMATION_RADIUS = 280;
+    const MIN_MADING_COLS = 7;
+    const MAX_MADING_COLS = 20;
+    const MIN_MADING_ROWS = 5;
+    const MAX_MADING_ROWS = 15;
+
+    let isAdminMode = false;
+    let isDraggingCanvas = false;
+    let hasMovedMouse = false;
+    let dragStartX = 0, dragStartY = 0;
+    let dragStartOffsetX = 0, dragStartOffsetY = 0;
+
+    let resizingPost = null;
+    let movingPost = null;
+    let hoverCol = -1, hoverRow = -1;
+    let pointerStartX = 0, pointerStartY = 0;
+
+    let currentBoardStyle = 'default';
+    let currentBgMode = 'default';
+
+    // Fullscreen Image Zoom State
+    let currentZoomScale = 1;
+    let imgPanX = 0, imgPanY = 0;
+    let isPanningImg = false, imgStartX = 0, imgStartY = 0;
+
+    const bgSchoolImg = new Image();
+    bgSchoolImg.crossOrigin = "anonymous";
+    bgSchoolImg.src = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQa3Oe395pp_6MVt0i32W_kKIYpDVy8GF4oUMaeSe9jf8Four7jsJOtcdc&s=10";
+
+    const imageCache = new Map();
+    function getCachedImage(url) {
+      if (!url) return null;
+      if (imageCache.has(url)) return imageCache.get(url);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = url;
+      img.onload = () => { img.isLoaded = true; };
+      imageCache.set(url, img);
+      return img;
+    }
+
+    const GRID_COLS = 115;
+    const GRID_ROWS = 50;
+    const CELL_SIZE = 48;
+
+    let postsData = [
+      {
+        id: 'post-center',
+        col: 50,
+        row: 20,
+        cols: 14,
+        rows: 9,
+        title: 'Selamat Datang di E-MADING Canvas SMA 8 Surakarta',
+        category: 'Informasi Sekolah',
+        author: 'Tim IT SMAN 8 Solo',
+        date: '2026-10-19',
+        content: 'Jelajahi karya, pengumuman, dan prestasi civitas akademika SMA 8 Surakarta.',
+        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'post-osis-1',
+        col: 10,
+        row: 8,
+        cols: 10,
+        rows: 7,
+        title: 'Pendaftaran Ekstrakurikuler Robotik & Coding 2026',
+        category: 'Pengumuman OSIS',
+        author: 'Pengurus OSIS Delta',
+        date: '2026-10-18',
+        content: 'Bagi siswa/i kelas X & XI yang berminat mengembangkan bakat di bidang teknologi, IoT, dan pemrograman web.',
+        imageUrl: ''
+      }
+    ];
+
+    let currentCategoryFilter = 'ALL';
+    let searchQuery = '';
+    let activeCellForModal = null;
+
+    async function loadMadingDataFromNetlify() {
+      try {
+        const response = await fetch('/.netlify/functions/maddingdata', { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson && Array.isArray(resJson.data) && resJson.data.length > 0) {
+            postsData = resJson.data;
+            postsData.forEach(p => { if (p.imageUrl) getCachedImage(p.imageUrl); });
+          }
+        }
+      } catch (err) {
+        console.warn('Menggunakan cache lokal.');
+      }
+    }
+
+    async function syncPostsToNetlify(actionType, updatedPost) {
+      localStorage.setItem('sma8_emading_v4_posts', JSON.stringify(postsData));
+      try {
+        await fetch('/.netlify/functions/maddingdata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: actionType, post: updatedPost, allPosts: postsData })
+        });
+      } catch (err) {
+        console.error('Error Netlify sync:', err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      canvas = document.getElementById('gridCanvas');
+      ctx = canvas.getContext('2d');
+      overlayContainer = document.getElementById('overlayContainer');
+      minimapCanvas = document.getElementById('minimapCanvas');
+      minimapCtx = minimapCanvas.getContext('2d');
+
+      lucide.createIcons();
+
+      const saved = localStorage.getItem('sma8_emading_v4_posts');
+      if (saved) { try { postsData = JSON.parse(saved); } catch(e) {} }
+
+      postsData.forEach(p => { if (p.imageUrl) getCachedImage(p.imageUrl); });
+      await loadMadingDataFromNetlify();
+
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      centerViewOnGrid(57, 25);
+
+      setupInteractions();
+      setupUIControls();
+
+      requestAnimationFrame(renderLoop);
+    });
+
+    function resizeCanvas() {
+      const container = document.getElementById('canvas-container');
+      const dpr = window.devicePixelRatio || 1;
+      width = container.clientWidth;
+      height = container.clientHeight;
+
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+
+    function centerViewOnGrid(targetCol, targetRow) {
+      offsetX = (width / 2) - ((targetCol) * CELL_SIZE * scale);
+      offsetY = (height / 2) - ((targetRow) * CELL_SIZE * scale);
+    }
+
+    function wrapText(context, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+      const words = text.split(' ');
+      let line = '';
+      let lineCount = 0;
+
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = context.measureText(testLine);
+
+        if (metrics.width > maxWidth && n > 0) {
+          context.fillText(line.trim(), x, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+          lineCount++;
+          if (lineCount >= maxLines - 1) {
+            context.fillText((line + '...').trim(), x, y);
+            return;
+          }
+        } else {
+          line = testLine;
+        }
+      }
+      context.fillText(line.trim(), x, y);
+    }
+
+    function postMatchesFilter(post) {
+      if (currentCategoryFilter !== 'ALL' && post.category !== currentCategoryFilter) return false;
+      const q = searchQuery.trim().toLowerCase();
+      if (q !== '') {
+        const t = (post.title || '').toLowerCase();
+        const a = (post.author || '').toLowerCase();
+        const c = (post.content || '').toLowerCase();
+        if (!t.includes(q) && !a.includes(q) && !c.includes(q)) return false;
+      }
+      return true;
+    }
+
+    const CATEGORIES = {
+      'Pengumuman OSIS': { bg: '#fffbeb', headerBg: '#d97706', headerText: '#ffffff', border: '#b45309', badge: 'OSIS' },
+      'Karya Seni': { bg: '#fdf2f8', headerBg: '#db2777', headerText: '#ffffff', border: '#be185d', badge: 'KARYA' },
+      'Prestasi': { bg: '#f0fdf4', headerBg: '#059669', headerText: '#ffffff', border: '#047857', badge: 'PRESTASI' },
+      'Literasi': { bg: '#f0f9ff', headerBg: '#0284c7', headerText: '#ffffff', border: '#0369a1', badge: 'LITERASI' },
+      'Kegiatan Ekstra': { bg: '#faf5ff', headerBg: '#7c3aed', headerText: '#ffffff', border: '#6d28d9', badge: 'EKSTRA' },
+      'Informasi Sekolah': { bg: '#f8fafc', headerBg: '#334155', headerText: '#ffffff', border: '#1e293b', badge: 'INFO SEKOLAH' }
+    };
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      try { drawFrame(); } catch (err) { console.error('Render error:', err); }
+    }
+
+    function drawFrame() {
+      const dpr = window.devicePixelRatio || 1;
+      const zoomEl = document.getElementById('zoomPercentage');
+      const zoomTxt = `${Math.round(scale * 100)}%`;
+      if (zoomEl.textContent !== zoomTxt) zoomEl.textContent = zoomTxt;
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const bgColor = isDark ? '#121110' : '#f1f0ec';
+      const centerScreenX = width / 2;
+      const centerScreenY = height / 2;
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, width, height);
+
+      if (currentBgMode === 'sekolah' && bgSchoolImg.complete && bgSchoolImg.naturalWidth > 0) {
+        ctx.save();
+        const parallaxX = (offsetX * 0.12) % width;
+        const parallaxY = (offsetY * 0.12) % height;
+        const imgRatio = bgSchoolImg.width / bgSchoolImg.height || 1.6;
+        let drawW = width * 1.35;
+        let drawH = drawW / imgRatio;
+
+        if (drawH < height * 1.35) {
+          drawH = height * 1.35;
+          drawW = drawH * imgRatio;
+        }
+
+        const baseDrawX = (width - drawW) / 2 + parallaxX;
+        const baseDrawY = (height - drawH) / 2 + parallaxY;
+
+        ctx.filter = 'blur(4px) brightness(0.62)';
+        ctx.drawImage(bgSchoolImg, baseDrawX, baseDrawY, drawW, drawH);
+        ctx.drawImage(bgSchoolImg, baseDrawX - drawW, baseDrawY, drawW, drawH);
+        ctx.drawImage(bgSchoolImg, baseDrawX + drawW, baseDrawY, drawW, drawH);
+        ctx.restore();
+
+        ctx.fillStyle = isDark ? 'rgba(18, 17, 16, 0.45)' : 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
+
+      const totalGridW = GRID_COLS * CELL_SIZE;
+      const totalGridH = GRID_ROWS * CELL_SIZE;
+
+      if (currentBoardStyle === '3d-real') {
+        const frameSize = 24;
+        ctx.fillStyle = '#452209';
+        ctx.fillRect(-frameSize, -frameSize, totalGridW + frameSize * 2, totalGridH + frameSize * 2);
+        ctx.fillStyle = '#6b3710';
+        ctx.fillRect(-frameSize + 4, -frameSize + 4, totalGridW + (frameSize - 4) * 2, totalGridH + (frameSize - 4) * 2);
+        ctx.fillStyle = '#cb9b51';
+        ctx.fillRect(0, 0, totalGridW, totalGridH);
+      } else if (currentBoardStyle === 'metal-board') {
+        const frameSize = 20;
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-frameSize, -frameSize, totalGridW + frameSize * 2, totalGridH + frameSize * 2);
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(0, 0, totalGridW, totalGridH);
+      } else {
+        ctx.fillStyle = isDark ? 'rgba(26, 24, 22, 0.85)' : 'rgba(255, 255, 255, 0.7)';
+        ctx.fillRect(0, 0, totalGridW, totalGridH);
+        ctx.strokeStyle = isDark ? 'rgba(255, 245, 235, 0.05)' : 'rgba(0, 0, 0, 0.06)';
+        ctx.lineWidth = 1;
+        for (let c = 0; c <= GRID_COLS; c++) {
+          ctx.beginPath(); ctx.moveTo(c * CELL_SIZE, 0); ctx.lineTo(c * CELL_SIZE, totalGridH); ctx.stroke();
+        }
+        for (let r = 0; r <= GRID_ROWS; r++) {
+          ctx.beginPath(); ctx.moveTo(0, r * CELL_SIZE); ctx.lineTo(totalGridW, r * CELL_SIZE); ctx.stroke();
+        }
+      }
+
+      let postsToExclaim = [];
+
+      postsData.forEach(post => {
+        if (!postMatchesFilter(post)) return;
+
+        const x = post.col * CELL_SIZE;
+        const y = post.row * CELL_SIZE;
+        const w = post.cols * CELL_SIZE;
+        const h = post.rows * CELL_SIZE;
+
+        const catStyle = CATEGORIES[post.category] || CATEGORIES['Informasi Sekolah'];
+
+        ctx.fillStyle = catStyle.bg;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = catStyle.border;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+
+        const headerH = Math.min(32, Math.max(22, h * 0.15));
+        ctx.fillStyle = catStyle.headerBg;
+        ctx.fillRect(x, y, w, headerH);
+
+        if (scale >= 0.2) {
+          const padding = Math.max(6, Math.min(16, w * 0.04));
+          const availableWidth = w - (padding * 2);
+
+          if (scale < 0.45) {
+            const img = post.imageUrl ? getCachedImage(post.imageUrl) : null;
+            if (img && (img.isLoaded || img.complete)) {
+              try {
+                const bodyY = y + headerH;
+                const bodyH = h - headerH;
+                // Keep aspect ratio centered draw
+                const imgAspect = img.naturalWidth / img.naturalHeight || 1.33;
+                const boxAspect = availableWidth / bodyH;
+                let dw, dh, dx, dy;
+                if (imgAspect > boxAspect) {
+                  dw = availableWidth; dh = availableWidth / imgAspect;
+                  dx = x + padding; dy = bodyY + (bodyH - dh) / 2;
+                } else {
+                  dh = bodyH; dw = bodyH * imgAspect;
+                  dx = x + padding + (availableWidth - dw) / 2; dy = bodyY;
+                }
+                ctx.drawImage(img, dx, dy, dw, dh);
+              } catch(e) {}
+            } else {
+              const titleFontSize = Math.max(12, Math.min(22, Math.floor(w / 14)));
+              ctx.fillStyle = '#0f172a';
+              ctx.font = `700 ${titleFontSize}px "Plus Jakarta Sans"`;
+              wrapText(ctx, post.title, x + padding, y + headerH + padding, availableWidth, titleFontSize + 4, 3);
+            }
+          } else {
+            const contentStartY = y + headerH + padding;
+            const titleFontSize = Math.max(11, Math.min(18, Math.floor(w / 22)));
+            const authorFontSize = Math.max(9, Math.min(11, Math.floor(w / 35)));
+            const bodyFontSize = Math.max(10, Math.min(13, Math.floor(w / 28)));
+
+            ctx.fillStyle = '#0f172a';
+            ctx.font = `700 ${titleFontSize}px "Plus Jakarta Sans"`;
+            const titleLineHeight = titleFontSize + 4;
+            wrapText(ctx, post.title, x + padding, contentStartY, availableWidth, titleLineHeight, 2);
+
+            const authorY = contentStartY + (titleLineHeight * 1.8);
+            ctx.fillStyle = '#64748b';
+            ctx.font = `500 ${authorFontSize}px "Plus Jakarta Sans"`;
+            ctx.fillText(`Oleh: ${post.author} • ${post.date}`, x + padding, authorY);
+
+            let currentY = authorY + authorFontSize + 8;
+            const totalRemainingH = (y + h - padding) - currentY;
+
+            if (post.imageUrl && totalRemainingH > 60) {
+              const imageAreaH = Math.min(totalRemainingH * 0.65, Math.max(120, h * 0.55));
+              const boxX = x + padding;
+              const boxY = currentY;
+
+              const img = getCachedImage(post.imageUrl);
+              if (img && (img.isLoaded || img.complete)) {
+                try {
+                  const imgAspect = img.naturalWidth / img.naturalHeight || 1.33;
+                  const boxAspect = availableWidth / imageAreaH;
+                  let dw, dh, dx, dy;
+                  if (imgAspect > boxAspect) {
+                    dw = availableWidth; dh = availableWidth / imgAspect;
+                    dx = boxX; dy = boxY + (imageAreaH - dh) / 2;
+                  } else {
+                    dh = imageAreaH; dw = imageAreaH * imgAspect;
+                    dx = boxX + (availableWidth - dw) / 2; dy = boxY;
+                  }
+                  ctx.drawImage(img, dx, dy, dw, dh);
+                } catch(e) {}
+              }
+              currentY += imageAreaH + 8;
+            }
+
+            const bodyAvailableH = (y + h - padding) - currentY;
+            const bodyLineHeight = bodyFontSize + 4;
+            const maxLines = Math.max(1, Math.floor(bodyAvailableH / bodyLineHeight));
+
+            if (maxLines > 0 && currentY < y + h - padding) {
+              ctx.fillStyle = '#334155';
+              ctx.font = `400 ${bodyFontSize}px "Plus Jakarta Sans"`;
+              wrapText(ctx, post.content, x + padding, currentY, availableWidth, bodyLineHeight, maxLines);
+            }
+          }
+        }
+
+        const topRightScreenX = (x + w) * scale + offsetX;
+        const topRightScreenY = y * scale + offsetY;
+        const screenPostCenterX = (x + w / 2) * scale + offsetX;
+        const screenPostCenterY = (y + h / 2) * scale + offsetY;
+        const distToCenter = Math.hypot(screenPostCenterX - centerScreenX, screenPostCenterY - centerScreenY);
+
+        if (distToCenter < EXCLAMATION_RADIUS) {
+          postsToExclaim.push({ post, topRightX: topRightScreenX, topRightScreenY, dist: distToCenter });
+        }
+      });
+
+      ctx.restore();
+
+      updateOverlayExclamationMarks(postsToExclaim, isDark);
+      renderMinimap();
+    }
+
+    function updateOverlayExclamationMarks(postsToExclaim, isDark) {
+      if (!overlayContainer) return;
+      const existingMarks = new Map();
+      Array.from(overlayContainer.children).forEach(el => existingMarks.set(el.dataset.postId, el));
+      const activeIds = new Set();
+
+      postsToExclaim.forEach(({ post, topRightX, topRightScreenY, dist }) => {
+        activeIds.add(post.id);
+        const proximityRatio = Math.max(0, 1 - (dist / EXCLAMATION_RADIUS));
+        const markScale = 0.35 + (proximityRatio * 0.65);
+
+        let mark = existingMarks.get(post.id);
+        if (!mark) {
+          mark = document.createElement('div');
+          mark.dataset.postId = post.id;
+          mark.className = 'absolute pointer-events-none transition-transform duration-75 ease-out flex items-center justify-center font-black select-none animate-exclamation';
+          mark.innerHTML = `<span class="exclamation-text text-[#991b1b] font-extrabold tracking-tighter" style="font-size: 32px; line-height: 1;">!</span>`;
+          overlayContainer.appendChild(mark);
+        }
+
+        const outlineColor = isDark ? '#000000' : '#ffffff';
+        const textSpan = mark.querySelector('.exclamation-text');
+        if (textSpan) {
+          textSpan.style.textShadow = `-1px -1px 0 ${outlineColor}, 1px -1px 0 ${outlineColor}, -1px 1px 0 ${outlineColor}, 1px 1px 0 ${outlineColor}`;
+        }
+
+        mark.style.left = `${topRightX}px`;
+        mark.style.top = `${topRightScreenY}px`;
+        mark.style.transform = `translate(-50%, -50%) scale(${markScale.toFixed(2)})`;
+      });
+
+      existingMarks.forEach((el, id) => { if (!activeIds.has(id)) el.remove(); });
+    }
+
+    function renderMinimap() {
+      const mw = minimapCanvas.width;
+      const mh = minimapCanvas.height;
+      const isDark = document.documentElement.classList.contains('dark');
+
+      minimapCtx.clearRect(0, 0, mw, mh);
+      minimapCtx.fillStyle = isDark ? '#1a1816' : '#e2e8f0';
+      minimapCtx.fillRect(0, 0, mw, mh);
+
+      const cellW = mw / GRID_COLS;
+      const cellH = mh / GRID_ROWS;
+
+      postsData.forEach(p => {
+        const catStyle = CATEGORIES[p.category] || CATEGORIES['Informasi Sekolah'];
+        minimapCtx.fillStyle = catStyle.headerBg;
+        minimapCtx.fillRect(p.col * cellW, p.row * cellH, Math.max(3, p.cols * cellW), Math.max(3, p.rows * cellH));
+      });
+
+      const viewX = (-offsetX / scale) / (GRID_COLS * CELL_SIZE) * mw;
+      const viewY = (-offsetY / scale) / (GRID_ROWS * CELL_SIZE) * mh;
+      const viewW = (width / scale) / (GRID_COLS * CELL_SIZE) * mw;
+      const viewH = (height / scale) / (GRID_ROWS * CELL_SIZE) * mh;
+
+      minimapCtx.strokeStyle = '#d97706';
+      minimapCtx.lineWidth = 1.5;
+      minimapCtx.strokeRect(viewX, viewY, viewW, viewH);
+    }
+
+    function setupInteractions() {
+      canvas.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        hasMovedMouse = false;
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+        const rect = canvas.getBoundingClientRect();
+        const worldX = (e.clientX - rect.left - offsetX) / scale;
+        const worldY = (e.clientY - rect.top - offsetY) / scale;
+
+        if (isAdminMode) {
+          for (let i = postsData.length - 1; i >= 0; i--) {
+            const p = postsData[i];
+            const pX1 = p.col * CELL_SIZE;
+            const pY1 = p.row * CELL_SIZE;
+            const pX2 = (p.col + p.cols) * CELL_SIZE;
+            const pY2 = (p.row + p.rows) * CELL_SIZE;
+
+            if (Math.abs(worldX - pX2) < 24 && Math.abs(worldY - pY2) < 24) {
+              resizingPost = { post: p, startX: e.clientX, startY: e.clientY, startCols: p.cols, startRows: p.rows };
+              return;
+            }
+            if (worldX >= pX1 && worldX <= pX2 && worldY >= pY1 && worldY <= pY2) {
+              movingPost = { post: p, startX: e.clientX, startY: e.clientY, startCol: p.col, startRow: p.row };
+              hasMovedMouse = false;
+              return;
+            }
+          }
+        }
+
+        isDraggingCanvas = true;
+        hasMovedMouse = false;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragStartOffsetX = offsetX;
+        dragStartOffsetY = offsetY;
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if ((isDraggingCanvas || movingPost || resizingPost) && Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY) > 4) hasMovedMouse = true;
+        const rect = canvas.getBoundingClientRect();
+        const worldX = (e.clientX - rect.left - offsetX) / scale;
+        const worldY = (e.clientY - rect.top - offsetY) / scale;
+        const c = Math.floor(worldX / CELL_SIZE);
+        const r = Math.floor(worldY / CELL_SIZE);
+
+        if (c >= 0 && c < GRID_COLS && r >= 0 && r < GRID_ROWS) {
+          hoverCol = c; hoverRow = r;
+          document.getElementById('coordinatesDisplay').textContent = `X:${c} Y:${r}`;
+        }
+
+        if (resizingPost) {
+          const addedCols = Math.round((e.clientX - resizingPost.startX) / scale / CELL_SIZE);
+          const addedRows = Math.round((e.clientY - resizingPost.startY) / scale / CELL_SIZE);
+          resizingPost.post.cols = Math.min(MAX_MADING_COLS, Math.max(MIN_MADING_COLS, resizingPost.startCols + addedCols));
+          resizingPost.post.rows = Math.min(MAX_MADING_ROWS, Math.max(MIN_MADING_ROWS, resizingPost.startRows + addedRows));
+          resizingPost.post.cols = Math.min(resizingPost.post.cols, GRID_COLS - resizingPost.post.col);
+          resizingPost.post.rows = Math.min(resizingPost.post.rows, GRID_ROWS - resizingPost.post.row);
+          return;
+        }
+
+        if (movingPost) {
+          const addedCols = Math.round((e.clientX - movingPost.startX) / scale / CELL_SIZE);
+          const addedRows = Math.round((e.clientY - movingPost.startY) / scale / CELL_SIZE);
+          movingPost.post.col = Math.min(GRID_COLS - movingPost.post.cols, Math.max(0, movingPost.startCol + addedCols));
+          movingPost.post.row = Math.min(GRID_ROWS - movingPost.post.rows, Math.max(0, movingPost.startRow + addedRows));
+          return;
+        }
+
+        if (isDraggingCanvas) {
+          offsetX = dragStartOffsetX + (e.clientX - dragStartX);
+          offsetY = dragStartOffsetY + (e.clientY - dragStartY);
+        }
+      });
+
+      const endPointer = () => {
+        const finished = movingPost || resizingPost;
+        if (finished && hasMovedMouse) syncPostsToNetlify('UPDATE', finished.post);
+        isDraggingCanvas = false; resizingPost = null; movingPost = null;
+      };
+      window.addEventListener('pointerup', endPointer);
+      window.addEventListener('pointercancel', endPointer);
+
+      minimapCanvas.addEventListener('click', (e) => {
+        const r = minimapCanvas.getBoundingClientRect();
+        centerViewOnGrid((e.clientX - r.left) / r.width * GRID_COLS, (e.clientY - r.top) / r.height * GRID_ROWS);
+      });
+
+      canvas.addEventListener('click', (e) => {
+        if (hasMovedMouse) return;
+        const rect = canvas.getBoundingClientRect();
+        const worldX = (e.clientX - rect.left - offsetX) / scale;
+        const worldY = (e.clientY - rect.top - offsetY) / scale;
+        const clickCol = Math.floor(worldX / CELL_SIZE);
+        const clickRow = Math.floor(worldY / CELL_SIZE);
+
+        const found = [...postsData].reverse().find(p => postMatchesFilter(p) && clickCol >= p.col && clickCol < p.col + p.cols && clickRow >= p.row && clickRow < p.row + p.rows);
+        if (found) { openCellModal(found.col, found.row, found); }
+        else if (isAdminMode && clickCol >= 0 && clickCol < GRID_COLS && clickRow >= 0 && clickRow < GRID_ROWS) {
+          openCellModal(Math.min(clickCol, GRID_COLS - MIN_MADING_COLS), Math.min(clickRow, GRID_ROWS - MIN_MADING_ROWS), null);
+        }
+      });
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+        const newScale = Math.min(Math.max(minScale, scale * zoomFactor), maxScale);
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        offsetX = mouseX - (mouseX - offsetX) * (newScale / scale);
+        offsetY = mouseY - (mouseY - offsetY) * (newScale / scale);
+        scale = newScale;
+        document.getElementById('zoomPercentage').textContent = `${Math.round(scale * 100)}%`;
+      }, { passive: false });
+    }
+
+    function setupUIControls() {
+      const zoomCenter = (factor) => {
+        const newScale = Math.min(maxScale, Math.max(minScale, scale * factor));
+        offsetX = width / 2 - (width / 2 - offsetX) * (newScale / scale);
+        offsetY = height / 2 - (height / 2 - offsetY) * (newScale / scale);
+        scale = newScale;
+      };
+      document.getElementById('zoomInBtn').addEventListener('click', () => zoomCenter(1.25));
+      document.getElementById('zoomOutBtn').addEventListener('click', () => zoomCenter(1 / 1.25));
+      document.getElementById('fitScreenBtn').addEventListener('click', () => {
+        scale = Math.min(maxScale, Math.max(minScale, Math.min(width / (GRID_COLS * CELL_SIZE), height / (GRID_ROWS * CELL_SIZE)) * 0.92));
+        centerViewOnGrid(GRID_COLS / 2, GRID_ROWS / 2);
+      });
+      document.getElementById('searchInput').addEventListener('input', (e) => { searchQuery = e.target.value; });
+      document.getElementById('categoryFilter').addEventListener('change', (e) => { currentCategoryFilter = e.target.value; });
+
+      const helpModal = document.getElementById('helpModal');
+      const openHelp = () => helpModal.classList.remove('opacity-0', 'pointer-events-none');
+      const closeHelp = () => helpModal.classList.add('opacity-0', 'pointer-events-none');
+      document.getElementById('helpBtn').addEventListener('click', openHelp);
+      document.getElementById('closeHelpBtn').addEventListener('click', closeHelp);
+      document.getElementById('understandHelpBtn').addEventListener('click', closeHelp);
+
+      const passModal = document.getElementById('passwordModal');
+      const closePass = () => passModal.classList.add('opacity-0', 'pointer-events-none');
+      [[helpModal, closeHelp], [passModal, closePass], [document.getElementById('postModal'), closeModal]].forEach(([m, fn]) => {
+        m.addEventListener('click', (e) => { if (e.target === m) fn(); });
+      });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeHelp(); closePass(); closeModal(); closeImageZoomModal(); } });
+
+      document.getElementById('editPostBtn').addEventListener('click', () => {
+        if (activeCellForModal && activeCellForModal.postToEdit) openEditForm(activeCellForModal.postToEdit);
+      });
+      document.getElementById('resetViewBtn').addEventListener('click', () => { scale = 0.65; centerViewOnGrid(57, 25); });
+      document.getElementById('themeToggleBtn').addEventListener('click', () => { document.documentElement.classList.toggle('dark'); });
+
+      document.getElementById('modeSwitcherBtn').addEventListener('click', () => {
+        if (isAdminMode) {
+          setAdminMode(false);
+        } else {
+          document.getElementById('adminPasswordInput').value = '';
+          document.getElementById('passwordError').classList.add('hidden');
+          document.getElementById('passwordModal').classList.remove('opacity-0', 'pointer-events-none');
+        }
+      });
+
+      document.getElementById('closePassBtn').addEventListener('click', () => document.getElementById('passwordModal').classList.add('opacity-0', 'pointer-events-none'));
+      document.getElementById('cancelPassBtn').addEventListener('click', () => document.getElementById('passwordModal').classList.add('opacity-0', 'pointer-events-none'));
+
+      document.getElementById('passwordForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (document.getElementById('adminPasswordInput').value === "SmaDelta8") {
+          setAdminMode(true);
+          document.getElementById('passwordModal').classList.add('opacity-0', 'pointer-events-none');
+        } else {
+          document.getElementById('passwordError').classList.remove('hidden');
+        }
+      });
+
+      const colsInput = document.getElementById('inputCols');
+      const rowsInput = document.getElementById('inputRows');
+      const updateFormSizePreview = () => {
+        document.getElementById('colsValDisplay').textContent = colsInput.value;
+        document.getElementById('rowsValDisplay').textContent = rowsInput.value;
+        document.getElementById('sizePreviewLabel').textContent = `${colsInput.value} Kolom × ${rowsInput.value} Baris`;
+      };
+      colsInput.addEventListener('input', updateFormSizePreview);
+      rowsInput.addEventListener('input', updateFormSizePreview);
+
+      document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+      document.getElementById('closeViewBtn').addEventListener('click', closeModal);
+      document.getElementById('cancelCreateBtn').addEventListener('click', closeModal);
+
+      const stylePanel = document.getElementById('stylePickerPanel');
+      const bgPanel = document.getElementById('bgPickerPanel');
+      const closePanel = (p) => { p.classList.add('opacity-0', 'scale-95', 'hidden'); };
+      const togglePanel = (p, other) => {
+        closePanel(other);
+        if (p.classList.contains('hidden')) {
+          p.classList.remove('hidden');
+          requestAnimationFrame(() => p.classList.remove('opacity-0', 'scale-95'));
+        } else closePanel(p);
+      };
+      document.getElementById('styleIslandBtn').addEventListener('click', (e) => { e.stopPropagation(); togglePanel(stylePanel, bgPanel); });
+      document.getElementById('bgIslandBtn').addEventListener('click', (e) => { e.stopPropagation(); togglePanel(bgPanel, stylePanel); });
+      document.addEventListener('click', (e) => {
+        if (!stylePanel.contains(e.target)) closePanel(stylePanel);
+        if (!bgPanel.contains(e.target)) closePanel(bgPanel);
+      });
+
+      document.querySelectorAll('.style-option-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentBoardStyle = btn.getAttribute('data-style');
+          document.querySelectorAll('.style-option-btn').forEach(b => b.classList.toggle('active-style-btn', b === btn));
+          closePanel(stylePanel);
+        });
+      });
+      document.querySelectorAll('.bg-option-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentBgMode = btn.getAttribute('data-bg');
+          document.querySelectorAll('.bg-option-btn').forEach(b => b.classList.toggle('active-style-btn', b === btn));
+          closePanel(bgPanel);
+        });
+      });
+
+      // Fullscreen Image Zoom Controls Setup
+      const zoomModal = document.getElementById('imageZoomModal');
+      const zoomImg = document.getElementById('fullscreenZoomImage');
+      const zoomIndicator = document.getElementById('zoomLevelIndicator');
+
+      document.getElementById('viewPostImageContainer').addEventListener('click', () => {
+        const src = document.getElementById('viewPostImage').src;
+        if (!src) return;
+        zoomImg.src = src;
+        currentZoomScale = 1;
+        imgPanX = 0; imgPanY = 0;
+        updateZoomTransform();
+        zoomModal.classList.remove('opacity-0', 'pointer-events-none');
+      });
+
+      const closeImageZoomModal = () => {
+        zoomModal.classList.add('opacity-0', 'pointer-events-none');
+      };
+      document.getElementById('closeZoomModalBtn').addEventListener('click', closeImageZoomModal);
+
+      const updateZoomTransform = () => {
+        zoomImg.style.transform = `translate(${imgPanX}px, ${imgPanY}px) scale(${currentZoomScale})`;
+        zoomIndicator.textContent = `${Math.round(currentZoomScale * 100)}%`;
+      };
+
+      document.getElementById('zoomInPrevBtn').addEventListener('click', () => {
+        currentZoomScale = Math.min(4, currentZoomScale + 0.25);
+        updateZoomTransform();
+      });
+      document.getElementById('zoomOutPrevBtn').addEventListener('click', () => {
+        currentZoomScale = Math.max(0.5, currentZoomScale - 0.25);
+        if (currentZoomScale === 1) { imgPanX = 0; imgPanY = 0; }
+        updateZoomTransform();
+      });
+      document.getElementById('zoomResetBtn').addEventListener('click', () => {
+        currentZoomScale = 1; imgPanX = 0; imgPanY = 0;
+        updateZoomTransform();
+      });
+
+      zoomImg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 0.85;
+        currentZoomScale = Math.min(5, Math.max(0.5, currentZoomScale * factor));
+        updateZoomTransform();
+      });
+
+      const zoomContainer = document.getElementById('zoomContainer');
+      zoomContainer.addEventListener('pointerdown', (e) => {
+        if (currentZoomScale > 1) {
+          isPanningImg = true;
+          imgStartX = e.clientX - imgPanX;
+          imgStartY = e.clientY - imgPanY;
+          zoomContainer.setPointerCapture(e.pointerId);
+        }
+      });
+      zoomContainer.addEventListener('pointermove', (e) => {
+        if (isPanningImg) {
+          imgPanX = e.clientX - imgStartX;
+          imgPanY = e.clientY - imgStartY;
+          updateZoomTransform();
+        }
+      });
+      const endImgPan = (e) => {
+        isPanningImg = false;
+        try { zoomContainer.releasePointerCapture(e.pointerId); } catch(err){}
+      };
+      zoomContainer.addEventListener('pointerup', endImgPan);
+      zoomContainer.addEventListener('pointercancel', endImgPan);
+
+      document.getElementById('createPostForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!activeCellForModal) return;
+
+        const targetPost = activeCellForModal.postToEdit || { id: 'post-' + Date.now(), col: activeCellForModal.col, row: activeCellForModal.row, date: new Date().toISOString().split('T')[0] };
+        targetPost.cols = Math.min(parseInt(colsInput.value), GRID_COLS - targetPost.col);
+        targetPost.rows = Math.min(parseInt(rowsInput.value), GRID_ROWS - targetPost.row);
+        targetPost.title = document.getElementById('inputTitle').value;
+        targetPost.category = document.getElementById('inputCategory').value;
+        targetPost.author = document.getElementById('inputAuthor').value;
+        targetPost.content = document.getElementById('inputContent').value;
+        targetPost.imageUrl = document.getElementById('inputImageUrl').value;
+
+        if (!activeCellForModal.postToEdit) postsData.push(targetPost);
+        syncPostsToNetlify(activeCellForModal.postToEdit ? 'UPDATE' : 'CREATE', targetPost);
+        closeModal();
+      });
+
+      document.getElementById('deletePostBtn').addEventListener('click', () => {
+        if (!activeCellForModal || !activeCellForModal.postToEdit) return;
+        if (!confirm('Hapus mading ini?')) return;
+        postsData = postsData.filter(p => p.id !== activeCellForModal.postToEdit.id);
+        syncPostsToNetlify('DELETE', activeCellForModal.postToEdit);
+        closeModal();
+      });
+    }
+
+    function setAdminMode(enable) {
+      isAdminMode = enable;
+      const statusText = document.getElementById('modeStatusText');
+      const badge = document.getElementById('modeIconBadge');
+      if (enable) {
+        statusText.textContent = 'Admin Mode';
+        badge.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i>';
+      } else {
+        statusText.textContent = 'Pengunjung';
+        badge.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
+      }
+      lucide.createIcons();
+    }
+
+    function updateFormSizePreview() {
+      const c = document.getElementById('inputCols').value;
+      const r = document.getElementById('inputRows').value;
+      document.getElementById('colsValDisplay').textContent = c;
+      document.getElementById('rowsValDisplay').textContent = r;
+      document.getElementById('sizePreviewLabel').textContent = `${c} Kolom × ${r} Baris`;
+    }
+
+    function showPostModal() {
+      document.getElementById('postModal').classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function openEditForm(post) {
+      activeCellForModal = { col: post.col, row: post.row, postToEdit: post };
+      document.getElementById('viewPostView').classList.add('hidden');
+      document.getElementById('createPostView').classList.remove('hidden');
+      document.getElementById('modalFormTitle').textContent = 'Edit Mading';
+      document.getElementById('createPostCoord').textContent = `[X:${post.col}, Y:${post.row}]`;
+      document.getElementById('inputCols').value = post.cols;
+      document.getElementById('inputRows').value = post.rows;
+      document.getElementById('inputTitle').value = post.title || '';
+      document.getElementById('inputCategory').value = post.category || 'Informasi Sekolah';
+      document.getElementById('inputAuthor').value = post.author || '';
+      document.getElementById('inputImageUrl').value = post.imageUrl || '';
+      document.getElementById('inputContent').value = post.content || '';
+      updateFormSizePreview();
+      showPostModal();
+    }
+
+    function openCellModal(col, row, postToEdit = null) {
+      activeCellForModal = { col, row, postToEdit };
+      if (postToEdit) {
+        document.getElementById('viewPostView').classList.remove('hidden');
+        document.getElementById('createPostView').classList.add('hidden');
+        document.getElementById('viewPostTitle').textContent = postToEdit.title;
+        document.getElementById('viewPostCategory').textContent = postToEdit.category;
+        document.getElementById('viewPostSize').textContent = `Ukuran: ${postToEdit.cols}x${postToEdit.rows}`;
+        document.getElementById('viewPostCoord').textContent = `[${postToEdit.col}, ${postToEdit.row}]`;
+        document.querySelector('#viewPostAuthor span.font-semibold').textContent = postToEdit.author || '-';
+        document.getElementById('viewPostDate').textContent = postToEdit.date || '-';
+        document.getElementById('viewPostContent').textContent = postToEdit.content;
+
+        const imgBox = document.getElementById('viewPostImageContainer');
+        const imgEl = document.getElementById('viewPostImage');
+        if (postToEdit.imageUrl) {
+          imgEl.onerror = () => imgBox.classList.add('hidden');
+          imgEl.src = postToEdit.imageUrl;
+          imgBox.classList.remove('hidden');
+        } else {
+          imgBox.classList.add('hidden');
+          imgEl.removeAttribute('src');
+        }
+
+        document.getElementById('editPostBtn').classList.toggle('hidden', !isAdminMode);
+        document.getElementById('deletePostBtn').classList.toggle('hidden', !isAdminMode);
+      } else {
+        if (!isAdminMode) { activeCellForModal = null; return; }
+        document.getElementById('viewPostView').classList.add('hidden');
+        document.getElementById('createPostView').classList.remove('hidden');
+        document.getElementById('createPostForm').reset();
+        document.getElementById('inputCols').value = MIN_MADING_COLS;
+        document.getElementById('inputRows').value = MIN_MADING_ROWS;
+        document.getElementById('modalFormTitle').textContent = 'Tempelkan Mading Baru';
+        document.getElementById('createPostCoord').textContent = `[X:${col}, Y:${row}]`;
+        updateFormSizePreview();
+      }
+      showPostModal();
+    }
+
+    function closeModal() {
+      document.getElementById('postModal').classList.add('opacity-0', 'pointer-events-none');
+      activeCellForModal = null;
+    }
+  </script>
+</body>
+</html>
